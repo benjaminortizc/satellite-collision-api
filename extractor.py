@@ -226,8 +226,8 @@ class EssentialExtractor:
         self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
         # Verificar credenciales
-        if not self.credentials.get('USERNAME') or not self.credentials.get('PASSWORD'):
-            print("❌ ERROR: Credenciales de Space-Track no encontradas en archivo env")
+        if not self.credentials.get('SPACE_TRACK_USERNAME') or not self.credentials.get('SPACE_TRACK_PASSWORD'):
+            print("❌ ERROR: Credenciales de Space-Track no encontradas en variables de entorno")
             raise Exception("Credenciales no encontradas")
     
     def extract_all_critical_data(self):
@@ -236,8 +236,8 @@ class EssentialExtractor:
         
         # Inicializar Space-Track
         self.space_track = SpaceTrackExtractor(
-            self.credentials['USERNAME'],
-            self.credentials['PASSWORD']
+            self.credentials['SPACE_TRACK_USERNAME'],
+            self.credentials['SPACE_TRACK_PASSWORD']
         )
         
         # Autenticar
