@@ -9,14 +9,16 @@ API para extraer y analizar datos de satélites, basura espacial y conjunciones 
 - **CDM Críticos**: Análisis de riesgo de colisión entre objetos
 - **API REST**: Interfaz web para consultar datos
 - **Documentación Automática**: Swagger UI integrado
+- **Despliegue Automático**: CI/CD con Azure
 
 ## 📋 Requisitos
 
 - Python 3.8+
 - Credenciales de Space-Track.org
 - FastAPI y dependencias
+- Azure CLI (para despliegue)
 
-## 🔧 Instalación
+## 🔧 Instalación Local
 
 1. **Clonar el repositorio:**
 ```bash
@@ -26,9 +28,9 @@ cd satellite-extractor-api
 
 2. **Crear archivo de credenciales:**
 ```bash
-# Crear archivo 'env' con tus credenciales
-echo "USERNAME=tu_usuario" > env
-echo "PASSWORD=tu_password" >> env
+# Copiar archivo de ejemplo
+cp env.example env
+# Editar con tus credenciales reales
 ```
 
 3. **Instalar dependencias:**
@@ -36,28 +38,47 @@ echo "PASSWORD=tu_password" >> env
 pip install -r requirements.txt
 ```
 
-## 🏃‍♂️ Uso Local
-
-1. **Ejecutar la API:**
+4. **Ejecutar la API:**
 ```bash
 python main.py
 ```
 
-2. **Acceder a la documentación:**
+5. **Acceder a la documentación:**
 ```
-http://localhost:8000/docs
+http://localhost:8003/docs
 ```
-
-3. **Probar endpoints:**
-- `GET /`: Información general
-- `GET /health`: Estado del servicio
-- `GET /extract`: Ejecutar extracción completa
 
 ## ☁️ Despliegue en Azure
 
-### Opción 1: Azure App Service
+### Opción 1: Despliegue Automático (Recomendado)
 
-1. **Crear App Service:**
+1. **Instalar Azure CLI:**
+```bash
+# Descargar desde: https://docs.microsoft.com/en-us/cli/azure/install-azure-cli
+```
+
+2. **Ejecutar script de despliegue:**
+```powershell
+.\deploy-to-azure.ps1
+```
+
+3. **Conectar repositorio Git:**
+```bash
+# Crear repositorio en GitHub/GitLab
+git remote add origin <tu-repositorio-url>
+git push -u origin main
+```
+
+4. **Configurar credenciales en Azure:**
+   - Ve al Portal de Azure
+   - App Service > Configuration > Application settings
+   - Agregar variables:
+     - `USERNAME`: Tu usuario de Space-Track
+     - `PASSWORD`: Tu contraseña de Space-Track
+
+### Opción 2: Despliegue Manual
+
+1. **Crear App Service en Azure Portal:**
    - Plataforma: Linux
    - Runtime: Python 3.10+
    - Startup Command: `./startup.sh`
@@ -65,29 +86,12 @@ http://localhost:8000/docs
 2. **Configurar variables de entorno:**
    - `USERNAME`: Tu usuario de Space-Track
    - `PASSWORD`: Tu contraseña de Space-Track
+   - `WEBSITES_PORT`: 8000
 
-3. **Desplegar código:**
-   - Usar Azure CLI, VSCode o GitHub Actions
-
-### Opción 2: Azure Container Instances
-
-1. **Crear Dockerfile:**
-```dockerfile
-FROM python:3.10-slim
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-COPY . .
-EXPOSE 8000
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
-```
-
-2. **Construir y desplegar:**
-```bash
-az container create --resource-group myResourceGroup \
-  --name satellite-api --image myregistry.azurecr.io/satellite-api:latest \
-  --ports 8000 --dns-name-label satellite-api
-```
+3. **Conectar Git:**
+   - App Service > Deployment Center
+   - Source: GitHub/GitLab
+   - Seleccionar repositorio y rama
 
 ## 📊 Estructura de Datos
 
@@ -97,18 +101,17 @@ az container create --resource-group myResourceGroup \
 {
   "status": "success",
   "metadata": {
-    "extraction_date": "2024-01-15T10:30:00",
-    "total_tle": 5000,
-    "total_debris": 25000,
-    "total_cdm": 150,
-    "critical_cdm": 12,
-    "total_records": 30150
+    "extraction_time": "2024-01-15T10:30:00",
+    "total_active_tle": 27066,
+    "total_debris_tle": 10346,
+    "total_critical_cdm": 68,
+    "total_records": 37480
   },
   "stats": {
     "high_risk": 5,
-    "medium_risk": 4,
-    "low_risk": 3,
-    "total": 30150
+    "medium_risk": 12,
+    "low_risk": 51,
+    "total": 37480
   },
   "csv_output_dir": "datos_criticos_20240115_103000"
 }
@@ -119,17 +122,65 @@ az container create --resource-group myResourceGroup \
 - Las credenciales se almacenan en variables de entorno
 - El archivo `env` está en `.gitignore`
 - La API incluye manejo de errores robusto
+- Autenticación con Space-Track.org
 
 ## 📝 Archivos Generados
 
 La extracción crea los siguientes archivos CSV:
 
 - `tle_activos.csv`: Elementos orbitales de satélites activos
-- `basura_espacial.csv`: Objetos de desecho espacial
-- `cdm_completos.csv`: Todos los mensajes de conjunción
-- `analisis_riesgo.csv`: Análisis de riesgo de colisión
+- `tle_basura_espacial.csv`: Objetos de desecho espacial
 - `cdm_criticos.csv`: Conjunciones de alto riesgo
-- `resumen_extraccion.csv`: Metadatos de la extracción
+- `metadata.json`: Metadatos de la extracción
+
+## 🌐 Endpoints Disponibles
+
+- `GET /`: Información general
+- `GET /health`: Estado del servicio
+- `GET /extract`: Ejecutar extracción completa
+- `GET /docs`: Documentación interactiva
+
+## 🚀 CI/CD con GitHub Actions
+
+El proyecto incluye configuración automática para GitHub Actions:
+
+```yaml
+# .github/workflows/deploy.yml
+name: Deploy to Azure
+on:
+  push:
+    branches: [ main ]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Deploy to Azure Web App
+      uses: azure/webapps-deploy@v2
+      with:
+        app-name: satellite-collision-api
+        package: .
+```
+
+## 📈 Monitoreo
+
+- **Logs**: Disponibles en Azure Portal > App Service > Log stream
+- **Métricas**: CPU, memoria, requests en Azure Portal
+- **Health Check**: Endpoint `/health` para monitoreo
+
+## 🆘 Solución de Problemas
+
+### Error de credenciales:
+- Verificar variables de entorno en Azure
+- Comprobar credenciales de Space-Track.org
+
+### Error de puerto:
+- Verificar `WEBSITES_PORT=8000` en configuración
+- Revisar startup command
+
+### Error de dependencias:
+- Verificar `requirements.txt`
+- Revisar logs de build en Azure
 
 ## 🤝 Contribuir
 
@@ -147,6 +198,7 @@ Este proyecto está bajo la Licencia MIT.
 
 Para problemas o preguntas:
 - Crear un issue en GitHub
+- Revisar logs en Azure Portal
 - Contactar al equipo de desarrollo
 
 ---
