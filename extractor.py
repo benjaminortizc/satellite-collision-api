@@ -13,19 +13,32 @@ from datetime import datetime, timedelta
 import time
 from collections import defaultdict
 
-# Configurar credenciales desde archivo env
+# Configurar credenciales desde archivo env o variables de entorno
 def load_credentials():
-    """Cargar credenciales desde archivo env"""
+    """Cargar credenciales desde archivo env o variables de entorno"""
     credentials = {}
+    
+    # Primero intentar leer desde variables de entorno (Azure App Service)
+    username = os.getenv('SPACE_TRACK_USERNAME')
+    password = os.getenv('SPACE_TRACK_PASSWORD')
+    
+    if username and password:
+        credentials['SPACE_TRACK_USERNAME'] = username
+        credentials['SPACE_TRACK_PASSWORD'] = password
+        print("✅ Credenciales cargadas desde variables de entorno")
+        return credentials
+    
+    # Si no están en variables de entorno, intentar archivo env (desarrollo local)
     try:
         with open('env', 'r') as f:
             for line in f:
                 if '=' in line:
                     key, value = line.strip().split('=', 1)
                     credentials[key] = value
+        print("✅ Credenciales cargadas desde archivo env")
         return credentials
     except FileNotFoundError:
-        print("❌ Archivo env no encontrado")
+        print("❌ Archivo env no encontrado y variables de entorno no configuradas")
         return {}
 
 def install_dependencies():
