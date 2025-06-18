@@ -12,6 +12,18 @@ import csv
 from datetime import datetime, timedelta
 import time
 from collections import defaultdict
+import glob
+
+# Azure Blob Storage
+try:
+    from azure.storage.blob import BlobServiceClient
+    AZURE_BLOB_AVAILABLE = True
+except ImportError:
+    AZURE_BLOB_AVAILABLE = False
+    print("⚠️ Azure Blob Storage no disponible - instalando...")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "azure-storage-blob"])
+    from azure.storage.blob import BlobServiceClient
+    AZURE_BLOB_AVAILABLE = True
 
 # Configurar credenciales desde archivo env o variables de entorno
 def load_credentials():
@@ -352,8 +364,64 @@ class EssentialExtractor:
         data = self.extract_all_critical_data()
         if not data:
             raise Exception("Error en la extracción")
+        
+        # Guardar localmente
+        csv_output = self.save_data(data)
+        
+        # Guardar en Blob Storage para ML
+        blob_info = save_to_blob_storage(data, csv_output)
+        
         return {
             "metadata": data["metadata"],
             "stats": self.show_stats(data, return_text=True),
-            "csv_output": self.save_data(data)
-        } 
+            "csv_output": csv_output,
+            "blob_storage": blob_info
+        }
+
+def save_to_blob_storage(data, output_dir):
+    """Guardar datos en Azure Blob Storage para entrenamiento de ML"""
+    try:
+        # Obtener credenciales de Blob Storage desde variables de entorno
+        connection_string = os.getenv('AZURE_STORAGE_CONNECTION_STRING')
+        container_name = os.getenv('AZURE_STORAGE_CONTAINER', 'satellite-data')
+        
+        if not connection_string:
+            print("⚠️ AZURE_STORAGE_CONNECTION_STRING no configurada - saltando Blob Storage")
+            return None
+        
+        # Crear cliente de Blob Storage
+        blob_service_client = BlobServiceClient.from_connection_string(connection_string)
+        container_client = blob_service_client.get_container_client(container_name)
+        
+        # Crear contenedor si no existe
+        try:
+            container_client.get_container_properties()
+        except:
+            container_client.create_container()
+            print(f"✅ Contenedor '{container_name}' creado")
+        
+        # Subir archivos CSV
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        uploaded_files = []
+        
+        for file_path in glob.glob(f"{output_dir}/*"):
+            if os.path.isfile(file_path):
+                file_name = os.path.basename(file_path)
+                blob_name = f"extractions/{timestamp}/{file_name}"
+                
+                with open(file_path, "rb") as data_file:
+                    blob_client = container_client.get_blob_client(blob_name)
+                    blob_client.upload_blob(data_file, overwrite=True)
+                
+                uploaded_files.append(blob_name)
+                print(f"✅ Subido a Blob Storage: {blob_name}")
+        
+        return {
+            "container": container_name,
+            "files": uploaded_files,
+            "timestamp": timestamp
+        }
+        
+    except Exception as e:
+        print(f"❌ Error guardando en Blob Storage: {e}")
+        return None 
