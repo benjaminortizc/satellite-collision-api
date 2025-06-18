@@ -4,6 +4,7 @@ import uvicorn
 from typing import Dict, Any
 import traceback
 import logging
+import os
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -43,6 +44,13 @@ def extract_data():
 @app.get("/health")
 def health_check():
     return {"status": "healthy", "service": "satellite-extractor-api"}
+
+@app.get("/env-debug")
+def env_debug():
+    return {
+        "SPACE_TRACK_USERNAME": os.getenv("SPACE_TRACK_USERNAME"),
+        "SPACE_TRACK_PASSWORD": os.getenv("SPACE_TRACK_PASSWORD")
+    }
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8003) 
